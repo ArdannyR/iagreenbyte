@@ -1,8 +1,4 @@
-# Instalar las siguientes librerías desde CMD:
-
 streamlit
 requests
 pandas
 plotly
-
-# Comando: pip install streamlit requests pandas plotly
