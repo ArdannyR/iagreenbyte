@@ -14,7 +14,7 @@ URL_BACKEND = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="FIA AgroPredictor Pro", page_icon="🛰️", layout="wide")
 
-# 2. Estilos CSS Avanzados (Efecto Neón y Tarjetas)
+# 2. Estilos CSS Avanzados 
 st.markdown("""
     <style>
     /* Fondo y textos generales */
