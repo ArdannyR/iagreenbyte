@@ -2,226 +2,165 @@ import streamlit as st
 import requests
 import os
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from dotenv import load_dotenv
 import time
 
-# 1. Configuración
+# 1. CONFIGURACIÓN INICIAL
 load_dotenv()
 try:
-    # Intenta obtener la URL de los secretos de Streamlit Cloud
+    # Intenta leer de la nube, si falla usa local
     URL_BACKEND = st.secrets["API_URL"]
 except FileNotFoundError:
-    # Si falla (porque estamos en local), usa la variable de entorno o el default
     URL_BACKEND = os.getenv("API_URL", "http://127.0.0.1:8000")
 
+st.set_page_config(page_title="FIA AgroSystem v3", page_icon="📡", layout="wide")
 
-st.set_page_config(page_title="FIA AgroPredictor Pro", page_icon="🛰️", layout="wide")
-
-# 2. Estilos CSS Avanzados 
+# 2. ESTILOS CSS (SpaceX Theme)
 st.markdown("""
     <style>
-    /* Fondo y textos generales */
     .stApp { background-color: #050505; color: #E0E0E0; }
     
-    /* Métricas estilo HUD */
-    div[data-testid="stMetricValue"] { 
-        color: #00F2FF; 
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
-        text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+    /* Status Badge en Sidebar */
+    .status-badge {
+        padding: 5px 10px; border-radius: 5px; font-weight: bold; text-align: center; margin-bottom: 20px;
     }
-    div[data-testid="stMetricLabel"] { color: #888; }
+    .online { background-color: #00ff41; color: black; border: 1px solid #00ff41; box-shadow: 0 0 10px #00ff41; }
+    .offline { background-color: #ff3333; color: white; border: 1px solid #ff3333; }
     
-    /* Botones Futuristas */
+    /* Métricas */
+    div[data-testid="stMetricValue"] { color: #00F2FF; font-family: 'Courier New', monospace; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); }
+    
+    /* Botones */
     .stButton>button {
         width: 100%; background-color: transparent; color: #00F2FF;
-        border: 1px solid #00F2FF; border-radius: 0px;
-        font-weight: bold; transition: 0.3s;
-        text-transform: uppercase; letter-spacing: 2px;
+        border: 1px solid #00F2FF; border-radius: 0px; font-weight: bold; transition: 0.3s;
     }
-    .stButton>button:hover { 
-        background-color: #00F2FF; color: black; 
-        box-shadow: 0 0 20px #00F2FF; 
-    }
+    .stButton>button:hover { background-color: #00F2FF; color: black; box-shadow: 0 0 15px #00F2FF; }
     
-    /* Tabs personalizadas */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px; white-space: pre-wrap; background-color: #111; border-radius: 4px 4px 0px 0px;
-        gap: 1px; padding-top: 10px; padding-bottom: 10px; color: white;
-    }
-    .stTabs [aria-selected="true"] { background-color: #00F2FF !important; color: black !important; }
+    /* Botón de Emergencia (Helada) */
+    .emergency-btn { border: 1px solid #ffaa00 !important; color: #ffaa00 !important; }
+    .emergency-btn:hover { background-color: #ffaa00 !important; color: black !important; box-shadow: 0 0 15px #ffaa00 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Helpers y Constantes
-mapa_meses = {
-    "Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4, "Mayo": 5, "Junio": 6,
-    "Julio": 7, "Agosto": 8, "Septiembre": 9, "Octubre": 10, "Noviembre": 11, "Diciembre": 12
-}
+# 3. FUNCIONES DE CONEXIÓN
+def check_server_status():
+    """Ruta 1: GET /Home - Verifica salud del sistema"""
+    try:
+        r = requests.get(f"{URL_BACKEND}/Home", timeout=2)
+        if r.status_code == 200:
+            return True, "SISTEMA ONLINE 🟢"
+    except:
+        pass
+    return False, "SISTEMA OFFLINE 🔴"
 
-# 4. Sidebar (Controles)
+# 4. BARRA LATERAL (CONTROLES)
+status_bool, status_msg = check_server_status()
+css_class = "online" if status_bool else "offline"
+
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3222/3222691.png", width=60)
-    st.title("COMANDO CENTRAL")
+    st.markdown(f'<div class="status-badge {css_class}">{status_msg}</div>', unsafe_allow_html=True)
+    st.title("🎛️ PANEL DE CONTROL")
     st.markdown("---")
     
-    with st.form("form_prediccion"):
-        st.subheader("📡 Datos de Sensores")
-        col_side_1, col_side_2 = st.columns(2)
-        with col_side_1:
-            temp_max = st.number_input("T. Máx (°C)", value=18.0, step=0.1)
-            lluvia = st.number_input("Lluvia (mm)", value=5.0, step=0.1)
-        with col_side_2:
-            temp_min = st.number_input("T. Mín (°C)", value=8.0, step=0.1)
-            humedad = st.number_input("Humedad (%)", value=60, step=1)
+    # --- SECCIÓN 1: PREDICCIÓN MANUAL ---
+    st.subheader("Simulación Manual")
+    with st.form("form_manual"):
+        col1, col2 = st.columns(2)
+        with col1:
+            t_max = st.number_input("T. Máx (°C)", 18.0)
+            lluvia = st.number_input("Lluvia (mm)", 5.0)
+        with col2:
+            t_min = st.number_input("T. Mín (°C)", 8.0)
+            hum = st.number_input("Humedad (%)", 60)
             
-        nombre_mes = st.selectbox("Mes de Análisis", list(mapa_meses.keys()))
+        mes = st.selectbox("Mes", ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"])
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        submit = st.form_submit_button("INICIAR ESCANEO CLIMÁTICO")
+        btn_manual = st.form_submit_button("CALCULAR PREDICCIÓN")
 
-# 5. Cuerpo Principal
-st.title("🛰️ Sistema de Predicción Climática | FIA")
-st.markdown(f"**Conexión Activa:** `{URL_BACKEND}` | **Región:** Sierra Ecuatoriana")
-
-# Variables de estado (para mantener datos si cambiamos de tab)
-if 'temp_result' not in st.session_state:
-    st.session_state['temp_result'] = None
-if 'riesgo_result' not in st.session_state:
-    st.session_state['riesgo_result'] = "En espera..."
-
-# LÓGICA DE PREDICCIÓN
-if submit:
-    mes_numero = mapa_meses[nombre_mes]
-    endpoint = f"{URL_BACKEND}/api/v1/predecir-clima"
-    payload = {
-        "temp_max": temp_max, "temp_min": temp_min,
-        "lluvia": lluvia, "humedad": humedad, "mes": mes_numero
-    }
-
-    # Barra de progreso simulada para efecto "Processing"
-    progress_text = "Calibrando modelos meteorológicos..."
-    my_bar = st.progress(0, text=progress_text)
-    for percent_complete in range(100):
-        time.sleep(0.01)
-        my_bar.progress(percent_complete + 1, text=progress_text)
-    my_bar.empty()
-
-    try:
-        response = requests.post(endpoint, json=payload, timeout=60)
-        if response.status_code == 200:
-            data = response.json()
-            resultado_inner = data.get("resultado", {})
-            
-            # Guardar en sesión
-            st.session_state['temp_result'] = resultado_inner.get("temperatura_manana_estimada", 0.0)
-            st.session_state['riesgo_result'] = resultado_inner.get("riesgo_descripcion", "Normal")
-            st.session_state['helada'] = resultado_inner.get("alerta_helada", False)
-            
-            st.toast('¡Cálculo finalizado con éxito!', icon='✅')
-            if st.session_state['helada']:
-                st.toast('ALERTA DE HELADA DETECTADA', icon='⚠️')
-        else:
-            st.error(f"Error del servidor: {response.status_code}")
-    except Exception as e:
-        st.error(f"Error de conexión: {e}")
-
-# 6. VISUALIZACIÓN CON TABS
-if st.session_state['temp_result'] is not None:
-    tab1, tab2, tab3 = st.tabs(["📊 DASHBOARD", "📈 ANÁLISIS HISTÓRICO", "🚜 RECOMENDACIONES"])
-
-    # TAB 1: EL RELOJ PRINCIPAL
-    with tab1:
-        col_metrics, col_gauge = st.columns([1, 2])
-        
-        with col_metrics:
-            st.markdown("### Resumen Ejecutivo")
-            st.metric(label="Temperatura Estimada", value=f"{st.session_state['temp_result']:.2f} °C", delta="Estable")
-            st.metric(label="Nivel de Riesgo", value=st.session_state['riesgo_result'], delta_color="off")
-            
-            if st.session_state['helada']:
-                st.error("🚨 ALERTA: Probabilidad de Helada")
-            else:
-                st.success("✅ Condiciones seguras para siembra")
-
-        with col_gauge:
-            val = st.session_state['temp_result']
-            fig = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = val,
-                title = {'text': "Termómetro Digital IA", 'font': {'size': 24, 'color': "#00F2FF"}},
-                gauge = {
-                    'axis': {'range': [None, 30], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': "#00F2FF"},
-                    'bgcolor': "rgba(0,0,0,0)",
-                    'steps': [
-                        {'range': [0, 5], 'color': "#ff3333"},
-                        {'range': [5, 12], 'color': "#333"},
-                    ],
-                    'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': val}
-                }
-            ))
-            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-            st.plotly_chart(fig, use_container_width=True)
-
-    # TAB 2: GRÁFICA COMPARATIVA (PLOTLY)
-    with tab2:
-        st.subheader("Comparativa vs Histórico (Simulación)")
-        
-        # Generamos datos ficticios para que se vea bonito el gráfico
-        # (En el futuro, esto vendría de tu Base de Datos)
-        dias = ["Hace 3 días", "Hace 2 días", "Ayer", "HOY (Predicción)", "Mañana", "Pasado"]
-        
-        # Simulamos una curva suave alrededor de la predicción
-        base_temp = st.session_state['temp_result']
-        temps = [base_temp - 2, base_temp - 1.5, base_temp - 0.5, base_temp, base_temp + 0.5, base_temp + 1.2]
-        
-        df_chart = pd.DataFrame({"Día": dias, "Temperatura": temps})
-        
-        fig_line = px.line(df_chart, x="Día", y="Temperatura", markers=True, title="Tendencia Térmica Semanal")
-        fig_line.update_traces(line_color='#00F2FF', line_width=4)
-        fig_line.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(255,255,255,0.05)',
-            font_color="white",
-            yaxis_title="Grados Centígrados"
-        )
-        st.plotly_chart(fig_line, use_container_width=True)
-
-    # TAB 3: CONSEJOS AGRÓNOMOS
-    with tab3:
-        st.subheader("💡 Asistente Agrónomo Inteligente")
-        col_consejo_1, col_consejo_2 = st.columns(2)
-        
-        temp_val = st.session_state['temp_result']
-        
-        with col_consejo_1:
-            st.info("💧 **Riego Sugerido**")
-            if temp_val > 20:
-                st.write("Alta evaporación detectada. Se recomienda riego abundante en la tarde.")
-            else:
-                st.write("Condiciones húmedas. Mantener riego moderado para evitar hongos.")
-                
-        with col_consejo_2:
-            st.warning("🛡️ **Protección de Cultivos**")
-            if temp_val < 8:
-                st.write("¡Atención! Temperaturas bajas. Cubrir semilleros esta noche.")
-            else:
-                st.write("Condiciones óptimas para fertilización foliar.")
-
-else:
-    # Pantalla de bienvenida
-    st.info("👈 Ingresa los datos en el panel lateral para calcular la predicción.")
-    st.markdown("""
-    ### Bienvenido al Sistema FIA
-    Este sistema utiliza Inteligencia Artificial conectada a satélites virtuales para proteger tus cultivos.
+    st.markdown("---")
     
-    **Instrucciones:**
-    1. Ajusta los parámetros de temperatura y humedad.
-    2. Selecciona el mes.
-    3. Presiona **INICIAR ESCANEO**.
-    """)
+    # --- SECCIÓN 2: ALERTA AUTOMÁTICA (NUEVA RUTA) ---
+    st.subheader("🚨 Monitor en Tiempo Real")
+    st.info("Consulta sensores remotos para detectar heladas al instante.")
+    btn_auto = st.button("VERIFICAR RIESGO DE HELADA (AUTO)")
+
+# 5. LÓGICA PRINCIPAL
+st.title("🛰️ Sistema de Predicción Climática | FIA")
+
+# MAPEO DE MESES
+mapa_meses = {"Enero":1, "Febrero":2, "Marzo":3, "Abril":4, "Mayo":5, "Junio":6, 
+            "Julio":7, "Agosto":8, "Septiembre":9, "Octubre":10, "Noviembre":11, "Diciembre":12}
+
+# --- CASO 1: PREDICCIÓN MANUAL (POST) ---
+if btn_manual:
+    endpoint = f"{URL_BACKEND}/api/v1/prediccion/temperatura"  # <--- RUTA ACTUALIZADA
+    payload = {
+        "temp_max": t_max, "temp_min": t_min, "lluvia": lluvia, 
+        "humedad": hum, "mes": mapa_meses[mes]
+    }
+    
+    with st.spinner("Procesando datos en el servidor..."):
+        try:
+            r = requests.post(endpoint, json=payload, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                # Ajustamos la lectura del JSON según tu backend
+                # Asumo que devuelve algo similar a {"resultado": {"prediccion": ...}}
+                # Si falla, intenta leer directamente el valor
+                resultado = data.get("resultado", data)
+                val_pred = resultado.get("temperatura_manana_estimada", resultado.get("prediccion", 0.0))
+                
+                col_res, col_graph = st.columns([1, 2])
+                with col_res:
+                    st.success("✅ Cálculo Exitoso")
+                    st.metric("Temperatura Estimada", f"{val_pred:.2f} °C", "Predicción IA")
+                
+                with col_graph:
+                    fig = go.Figure(go.Indicator(
+                        mode = "gauge+number", value = val_pred,
+                        title = {'text': "Termómetro IA", 'font': {'color': "#00F2FF"}},
+                        gauge = {'axis': {'range': [None, 30]}, 'bar': {'color': "#00F2FF"}}
+                    ))
+                    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=250)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.error(f"Error {r.status_code}: {r.text}")
+        except Exception as e:
+            st.error(f"Error de conexión: {e}")
+
+# --- CASO 2: HELADA AUTOMÁTICA (GET) ---
+if btn_auto:
+    endpoint_auto = f"{URL_BACKEND}/api/v1/prediccion/helada-automatica" # <--- NUEVA RUTA
+    
+    with st.spinner("Conectando con estación meteorológica automática..."):
+        try:
+            # Al ser GET, no enviamos JSON, solo pedimos la info
+            r = requests.get(endpoint_auto, timeout=10)
+            
+            if r.status_code == 200:
+                data = r.json()
+                st.markdown("### 📡 Reporte Automático de Sensores")
+                st.json(data) # Muestra la respuesta cruda para ver qué trae
+                
+                # Intentamos mostrarlo bonito si trae un campo de "mensaje" o "alerta"
+                mensaje = data.get("mensaje", "Datos recibidos")
+                es_helada = data.get("hay_helada", False) # Ajusta esta clave según lo que veas en el JSON
+                
+                if es_helada:
+                    st.error(f"⚠️ ¡ALERTA CRÍTICA! {mensaje}")
+                    st.toast("Riesgo de Helada Detectado", icon="❄️")
+                else:
+                    st.success(f"✅ Zona Segura: {mensaje}")
+                    
+            else:
+                st.warning(f"No se pudo obtener el reporte automático. Código: {r.status_code}")
+        except Exception as e:
+            st.error(f"Error al conectar con el servicio automático: {e}")
+
+# Footer de bienvenida si no se ha hecho nada
+if not btn_manual and not btn_auto:
+    st.info("👈 Usa el panel lateral para elegir entre **Simulación Manual** o **Escaneo Automático**.")
