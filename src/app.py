@@ -10,7 +10,13 @@ import time
 
 # 1. Configuración
 load_dotenv()
-URL_BACKEND = os.getenv("API_URL", "http://127.0.0.1:8000")
+try:
+    # Intenta obtener la URL de los secretos de Streamlit Cloud
+    URL_BACKEND = st.secrets["API_URL"]
+except FileNotFoundError:
+    # Si falla (porque estamos en local), usa la variable de entorno o el default
+    URL_BACKEND = os.getenv("API_URL", "http://127.0.0.1:8000")
+
 
 st.set_page_config(page_title="FIA AgroPredictor Pro", page_icon="🛰️", layout="wide")
 
