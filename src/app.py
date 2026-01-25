@@ -46,15 +46,20 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. FUNCIONES DE CONEXIÓN
+
 def check_server_status():
-    """Ruta 1: GET /Home - Verifica salud del sistema"""
+    """Ruta 1: GET / - Verifica salud del sistema"""
     try:
-        r = requests.get(f"{URL_BACKEND}/Home", timeout=2)
+        
+        r = requests.get(f"{URL_BACKEND}/", timeout=5)
+        
         if r.status_code == 200:
             return True, "SISTEMA ONLINE 🟢"
-    except:
-        pass
-    return False, "SISTEMA OFFLINE 🔴"
+        else:
+            return False, f"ERROR {r.status_code} 🔴"
+            
+    except Exception as e:
+        return False, "SISTEMA OFFLINE 🔴"
 
 # 4. BARRA LATERAL (CONTROLES)
 status_bool, status_msg = check_server_status()
@@ -97,7 +102,7 @@ mapa_meses = {"Enero":1, "Febrero":2, "Marzo":3, "Abril":4, "Mayo":5, "Junio":6,
 
 # --- CASO 1: PREDICCIÓN MANUAL (POST) ---
 if btn_manual:
-    endpoint = f"{URL_BACKEND}/api/v1/prediccion/temperatura"  # <--- RUTA ACTUALIZADA
+    endpoint = f"{URL_BACKEND}/api/v1/prediccion/temperatura"
     payload = {
         "temp_max": t_max, "temp_min": t_min, "lluvia": lluvia, 
         "humedad": hum, "mes": mapa_meses[mes]
@@ -108,16 +113,17 @@ if btn_manual:
             r = requests.post(endpoint, json=payload, timeout=10)
             if r.status_code == 200:
                 data = r.json()
-                # Ajustamos la lectura del JSON según tu backend
-                # Asumo que devuelve algo similar a {"resultado": {"prediccion": ...}}
-                # Si falla, intenta leer directamente el valor
-                resultado = data.get("resultado", data)
-                val_pred = resultado.get("temperatura_manana_estimada", resultado.get("prediccion", 0.0))
+
+                val_pred = data.get("prediccion_temperatura", 0.0)
                 
+                unidad = data.get("unidad", "°C")
+
+                # 3. Visualización
                 col_res, col_graph = st.columns([1, 2])
                 with col_res:
                     st.success("✅ Cálculo Exitoso")
-                    st.metric("Temperatura Estimada", f"{val_pred:.2f} °C", "Predicción IA")
+                    
+                    st.metric("Temperatura Estimada", f"{val_pred:.2f} {unidad}", "Predicción IA")
                 
                 with col_graph:
                     fig = go.Figure(go.Indicator(
@@ -134,21 +140,21 @@ if btn_manual:
 
 # --- CASO 2: HELADA AUTOMÁTICA (GET) ---
 if btn_auto:
-    endpoint_auto = f"{URL_BACKEND}/api/v1/prediccion/helada-automatica" # <--- NUEVA RUTA
+    endpoint_auto = f"{URL_BACKEND}/api/v1/prediccion/helada-automatica" 
     
     with st.spinner("Conectando con estación meteorológica automática..."):
         try:
-            # Al ser GET, no enviamos JSON, solo pedimos la info
+            
             r = requests.get(endpoint_auto, timeout=10)
             
             if r.status_code == 200:
                 data = r.json()
                 st.markdown("### 📡 Reporte Automático de Sensores")
-                st.json(data) # Muestra la respuesta cruda para ver qué trae
+                st.json(data) 
                 
-                # Intentamos mostrarlo bonito si trae un campo de "mensaje" o "alerta"
+                
                 mensaje = data.get("mensaje", "Datos recibidos")
-                es_helada = data.get("hay_helada", False) # Ajusta esta clave según lo que veas en el JSON
+                es_helada = data.get("hay_helada", False) 
                 
                 if es_helada:
                     st.error(f"⚠️ ¡ALERTA CRÍTICA! {mensaje}")
@@ -161,6 +167,6 @@ if btn_auto:
         except Exception as e:
             st.error(f"Error al conectar con el servicio automático: {e}")
 
-# Footer de bienvenida si no se ha hecho nada
+
 if not btn_manual and not btn_auto:
     st.info("👈 Usa el panel lateral para elegir entre **Simulación Manual** o **Escaneo Automático**.")
