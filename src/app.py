@@ -14,7 +14,7 @@ except FileNotFoundError:
     URL_BACKEND = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(
-    page_title="FIA AgroSystem", 
+    page_title="AgreenPrediction", 
     page_icon="🛰️", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -88,7 +88,7 @@ with st.sidebar:
     btn_auto = st.button("VERIFICAR RIESGO HELADA")
 
 # 5. LÓGICA PRINCIPAL
-st.title("🛰️ Sistema de Predicción Climática | FIA")
+st.title("Sistema de Predicción Climática")
 mapa_meses = {"Enero":1, "Febrero":2, "Marzo":3, "Abril":4, "Mayo":5, "Junio":6, 
             "Julio":7, "Agosto":8, "Septiembre":9, "Octubre":10, "Noviembre":11, "Diciembre":12}
 
@@ -123,7 +123,7 @@ if btn_manual:
                             gauge = {'axis': {'range': [None, 30]}, 'bar': {'color': "#00F2FF"},
                                     'steps': [{'range': [0, 5], 'color': "#330000"}]}
                         ))
-                        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=250)
+                        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, height=450)
                         st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.error(f"Error {r.status_code}: {r.text}")
@@ -197,7 +197,7 @@ if not btn_manual and not btn_auto:
             <source src="{video_src}">
         </video>
         <div class="hero-content">
-            <div class="hero-title">FIA <span style="color:#00F2FF">AGRO-SYSTEM</span></div>
+            <div class="hero-title">AGREEN<span style="color:#00F2FF">-PREDICTION</span></div>
             <div class="hero-subtitle">Inteligencia Artificial para la Seguridad Alimentaria</div>
             <p style="color: #aaa; margin-top: 20px;">
                 Monitoreo satelital y predicción de heladas en tiempo real para la Sierra Ecuatoriana.
